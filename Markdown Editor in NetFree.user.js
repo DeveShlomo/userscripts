@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Markdown Editor in NetFree
 // @namespace    http://tampermonkey.net/
-// @version      2.1
+// @version      2.2
 // @description  עורך טקסט מתקדם לנטפרי
 // @author       Assistant
 // @match        https://netfree.link/app/*
@@ -194,7 +194,7 @@
         textarea.dispatchEvent(new Event('input', { bubbles: true }));
     }
 
-    // --- יצירת התצוגה המקדימה ---
+// --- יצירת התצוגה המקדימה ---
     function createLivePreview(textarea, toolbar) {
         // מציאת פרטי משתמש
         let userName = "אני";
@@ -209,8 +209,7 @@
             }
         } catch(e) {}
 
-        // ניסיון לשליפת תמונה משדה הקלט
-        // אנו מחפשים את התמונה שנמצאת ליד התיבה הנוכחית
+        // ניסיון לשליפת תמונה משדה הקלט (רלוונטי רק בפניה קיימת)
         const inputMessageContainer = textarea.closest('.chat-message');
         if (inputMessageContainer) {
             const avatarImg = inputMessageContainer.querySelector('img.message-avatar');
@@ -219,18 +218,18 @@
             }
         }
 
-        // יצירת אלמנט התצוגה (מבוסס על ה-HTML של נטפרי)
+        // יצירת אלמנט התצוגה
         const previewDiv = document.createElement('div');
         previewDiv.id = 'nf-live-preview-container';
         previewDiv.className = 'chat-message left'; // שימוש בקלאסים המקוריים
 
-        // ה-HTML הפנימי זהה להודעה רגילה בנטפרי
+        // ה-HTML הפנימי עם התיקון לקו המפריד
         previewDiv.innerHTML = `
             <img class="message-avatar" style="border-radius: 100%; height: 38px; width: 38px;" src="${userAvatar}">
             <div class="message">
                 <div class="title" style="border-bottom: 1px solid #eee; padding-bottom: 5px; margin-bottom: 5px;">
                     <strong>${userName}</strong>
-                    <div class="post-title-right" style="float: left;"> <!-- בנטפרי הזמן בצד שמאל -->
+                    <div class="post-title-right" style="float: left;">
                         <span class="time-ago" style="font-weight: bold; color: #1ab394;">תצוגה מקדימה</span>
                     </div>
                 </div>
@@ -240,9 +239,13 @@
             </div>
         `;
 
-        // הוספת הדיב לפני הקונטיינר של ההודעה הנוכחית
+        // הוספת הדיב לדף - לוגיקה מעודכנת
         if (inputMessageContainer && inputMessageContainer.parentNode) {
+            // תרחיש 1: פניה קיימת (יש היסטוריית הודעות) - מכניסים לפני התיבה הנוכחית
             inputMessageContainer.parentNode.insertBefore(previewDiv, inputMessageContainer);
+        } else {
+            // תרחיש 2: פניה חדשה (אין הודעות קודמות) - מכניסים לפני סרגל הכלים שלנו
+            toolbar.parentNode.insertBefore(previewDiv, toolbar);
         }
 
         // אלמנט התוכן לעדכון
