@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Markdown Editor in NetFree
 // @namespace    http://tampermonkey.net/
-// @version      2.2
+// @version      3.0
 // @description  עורך טקסט מתקדם לנטפרי
 // @author       לאצי&AI
 // @match        https://netfree.link/app/*
@@ -16,7 +16,7 @@
     const styles = `
         .nf-md-toolbar {
             display: flex;
-            justify-content: space-between; /* מפריד בין הקבוצות לקצוות */
+            justify-content: space-between;
             padding: 6px;
             background: #f3f3f4;
             border: 1px solid #e7eaec;
@@ -68,170 +68,184 @@
             border: 1px solid #ddd;
             border-radius: 4px;
             box-shadow: 0 6px 12px rgba(0,0,0,0.175);
-            min-width: 160px;
+            min-width: 140px;
             padding: 5px 0;
             margin-top: 2px;
         }
         .nf-dropdown-menu.show { display: block; }
         .nf-dropdown-item {
             display: block;
-            padding: 8px 15px;
-            clear: both;
+            padding: 5px 15px;
             font-weight: 400;
-            line-height: 1.42857143;
             color: #333;
-            white-space: nowrap;
-            text-decoration: none;
             cursor: pointer;
             text-align: right;
         }
-        .nf-dropdown-item:hover { background-color: #f5f5f5; color: #262626; }
+        .nf-dropdown-item:hover { background-color: #f5f5f5; }
 
         /* סגנון לתצוגה המקדימה החיה */
         #nf-live-preview-container {
             margin-bottom: 15px;
             margin-top: 10px;
             opacity: 1;
-            transition: opacity 0.3s, margin 0.3s;
+            transition: opacity 0.3s;
             border: 1px dashed #1ab394;
             background-color: rgba(255, 255, 255, 0.5);
             border-radius: 5px;
         }
         #nf-live-preview-container.hidden {
-            display: none;
-            opacity: 0;
-            margin: 0;
+            display: none !important;
         }
-        .nf-separator {
-            width: 1px; height: 20px; background: #ccc; margin: 0 5px;
-        }
+
+        /* עיצוב פנימי של התצוגה המקדימה */
+        .nf-preview-content table { border-collapse: collapse; width: 100%; margin-bottom: 10px; }
+        .nf-preview-content th, .nf-preview-content td { border: 1px solid #ddd; padding: 8px; text-align: right; }
+        .nf-preview-content th { background-color: #f2f2f2; font-weight: bold; }
+        .nf-preview-content blockquote { border-right: 5px solid #eee; padding-right: 15px; margin-right: 0; color: #777; margin: 10px 0; }
+        .nf-preview-content img { max-width: 100%; height: auto; }
+        .nf-preview-content ul, .nf-preview-content ol { padding-right: 20px; margin: 10px 0; }
+
+        .nf-separator { width: 1px; height: 20px; background: #ccc; margin: 0 5px; }
     `;
 
     const styleSheet = document.createElement("style");
     styleSheet.innerText = styles;
     document.head.appendChild(styleSheet);
 
-    // --- מנוע המרת Markdown ל-HTML (תומך markdown-it בסיסי) ---
+    // --- מנוע המרת Markdown ל-HTML (משופר) ---
     function markdownToHtml(text) {
-        let html = text
-            .replace(/```([\s\S]*?)```/g, (match, code) => '<pre>' + code.replace(/</g, '&lt;') + '</pre>')
+        // 1. ניקוי HTML קיים
+        let html = text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+        // 2. שמירת בלוקי קוד
+        const codeBlocks = [];
+        html = html.replace(/```([\s\S]*?)```/g, (match, code) => {
+            codeBlocks.push(`<pre>${code}</pre>`);
+            return `__CODEBLOCK_${codeBlocks.length - 1}__`;
+        });
+
+        // 3. טבלאות
+        html = html.replace(/((?:^\|.*\|$\n?)+)/gm, (match) => {
+            const lines = match.trim().split('\n');
+            if (lines.length < 2) return match;
+            let tableHtml = '<table>';
+            lines.forEach((line, index) => {
+                if (line.includes('---')) return;
+                const cells = line.split('|').filter(c => c.trim() !== '');
+                const tag = index === 0 ? 'th' : 'td';
+                tableHtml += '<tr>';
+                cells.forEach(cell => { tableHtml += `<${tag}>${cell.trim()}</${tag}>`; });
+                tableHtml += '</tr>';
+            });
+            tableHtml += '</table>';
+            return tableHtml;
+        });
+
+        // 4. רשימות (טיפול קבוצתי כדי לעטוף ב-UL/OL)
+        // רשימה ממוספרת
+        html = html.replace(/^(?:\d+\.\s+.*(?:\n|$))+/gm, (match) => {
+            const items = match.replace(/^\d+\.\s+(.*)$/gm, '<li>$1</li>');
+            return `<ol>${items}</ol>`;
+        });
+        // רשימה רגילה
+        html = html.replace(/^(?:[\*\-]\s+.*(?:\n|$))+/gm, (match) => {
+            const items = match.replace(/^[\*\-]\s+(.*)$/gm, '<li>$1</li>');
+            return `<ul>${items}</ul>`;
+        });
+        // 5. ציטוטים (תיקון: זיהוי ה-&gt; שנוצר לאחר הניקוי)
+        html = html.replace(/((?:^&gt;.*(?:\n|$))+)/gm, (match) => {
+            // מסיר את ה-&gt; ואת הרווח מתחילת השורה
+            let content = match.replace(/^&gt;\s?(.*)/gm, '$1');
+            content = content.replace(/\n/g, '<br>');
+            return `<blockquote>${content}</blockquote>`;
+        });
+
+        // 6. עיצובים נוספים
+        html = html
             .replace(/^#{1}\s+(.*)$/gm, '<h1>$1</h1>')
             .replace(/^#{2}\s+(.*)$/gm, '<h2>$1</h2>')
             .replace(/^#{3}\s+(.*)$/gm, '<h3>$1</h3>')
             .replace(/^#{4}\s+(.*)$/gm, '<h4>$1</h4>')
             .replace(/^#{5}\s+(.*)$/gm, '<h5>$1</h5>')
             .replace(/^#{6}\s+(.*)$/gm, '<h6>$1</h6>')
-            .replace(/^\s*\*\*\*\s*$/gm, '<hr>') // קו מפריד
+            .replace(/^\s*(\*{3,}|-{3,})\s*$/gm, '<hr>')
             .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
             .replace(/\*(.*?)\*/g, '<i>$1</i>')
             .replace(/~~(.*?)~~/g, '<del>$1</del>')
-            .replace(/`([^`\n]+)`/g, '<code>$1</code>')
+            // תמונות - שיפור הרגקס
+            .replace(/!\[(.*?)\]\((.*?)\)/g, '<img src="$2" alt="$1">')
+            // קישורים
             .replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank" style="color:#1ab394">$1</a>')
-            .replace(/^\*\s+(.*)/gm, '<li>$1</li>')
+            .replace(/`([^`\n]+)`/g, '<code>$1</code>')
+            // המרת ירידות שורה רגילות (שלא טופלו בבלוקים)
             .replace(/\n/g, '<br>');
 
-        // ניקוי BR מיותרים
-        html = html.replace(/<\/h(\d)><br>/g, '</h$1>');
-        html = html.replace(/<\/div><br>/g, '</div>');
-        html = html.replace(/<\/pre><br>/g, '</pre>');
-        html = html.replace(/<hr><br>/g, '<hr>');
+        // 7. שחזור בלוקים וניקוי
+        html = html.replace(/__CODEBLOCK_(\d+)__/g, (match, index) => codeBlocks[index]);
+
+        // ניקוי תגיות סוגרות שיש אחריהן BR מיותר
+        const tagsToClean = ['h1','h2','h3','h4','h5','h6','div','pre','hr','table','blockquote','ol','ul','li'];
+        tagsToClean.forEach(tag => {
+            const regex = new RegExp(`<\/${tag}><br>`, 'g');
+            html = html.replace(regex, `</${tag}>`);
+        });
 
         return html;
     }
 
-    // --- פונקציה להוספת טקסט שתומכת ב-Undo (Ctrl+Z) ---
+    // --- הוספת טקסט עם Undo ---
     function insertTextCommand(textarea, text, selectStart, selectEnd) {
         textarea.focus();
-        // שימוש ב-execCommand שומר על היסטוריית ה-Undo של הדפדפן
         const success = document.execCommand('insertText', false, text);
-
-        // אם הפקודה נכשלה (קורה לפעמים), נשתמש בשיטה הישנה
-        if (!success) {
-            textarea.setRangeText(text, textarea.selectionStart, textarea.selectionEnd, 'end');
-        }
-
-        // שחזור הבחירה אם נדרש
-        if (typeof selectStart === 'number' && typeof selectEnd === 'number') {
-            textarea.setSelectionRange(selectStart, selectEnd);
-        }
-
-        // עדכון אנגולר
+        if (!success) textarea.setRangeText(text, textarea.selectionStart, textarea.selectionEnd, 'end');
         textarea.dispatchEvent(new Event('input', { bubbles: true }));
     }
 
-    // --- לוגיקה חכמה רגילה ---
     function insertSmart(textarea, prefix, suffix, placeholder) {
         const start = textarea.selectionStart;
         const end = textarea.selectionEnd;
-        const text = textarea.value;
-        const selectedText = text.substring(start, end);
+        const selectedText = textarea.value.substring(start, end);
 
-        let textToInsert = '';
-        let newSelectStart, newSelectEnd;
+        let textToInsert = selectedText.length === 0 ? prefix + placeholder + suffix : prefix + selectedText + suffix;
+        insertTextCommand(textarea, textToInsert);
 
         if (selectedText.length === 0) {
-            textToInsert = prefix + placeholder + suffix;
-            // חישוב המיקום החדש לבחירה (הפלייסהולדר)
-            // מכיוון שאנחנו משתמשים ב-insertText, המיקום הוא יחסי למיקום הנוכחי
-            // אבל execCommand מזיז את הסמן לסוף. נצטרך לחשב ידנית.
-            const insertPos = start;
-            insertTextCommand(textarea, textToInsert);
-            textarea.setSelectionRange(insertPos + prefix.length, insertPos + prefix.length + placeholder.length);
-        } else {
-            textToInsert = prefix + selectedText + suffix;
-            insertTextCommand(textarea, textToInsert);
-            // במקרה של עטיפה, לרוב נרצה להשאיר את הסמן בסוף או לעטוף הכל. נשאיר בסוף.
+            const newCursor = textarea.selectionEnd;
+            textarea.setSelectionRange(newCursor - suffix.length - placeholder.length, newCursor - suffix.length);
         }
     }
 
-    // --- לוגיקה ייעודית לקישורים (דרישה 1) ---
     function insertLink(textarea) {
         const start = textarea.selectionStart;
         const end = textarea.selectionEnd;
-        const text = textarea.value;
-        const selectedText = text.substring(start, end);
-
-        let finalString = "";
-        let selectionOffsetStart = 0;
-        let selectionOffsetEnd = 0;
-
-        if (selectedText.length > 0) {
-            // יש טקסט מסומן -> הוא הופך לטקסט של הקישור
-            // [טקסט מסומן](כתובת קישור)
-            finalString = `[${selectedText}](כתובת קישור)`;
-            // אנחנו רוצים לסמן את "כתובת קישור"
-            // המיקום הוא: נקודת ההתחלה + סוגריים + אורך הטקסט + סגירת סוגריים ופתיחת סוגריים עגולים
-            selectionOffsetStart = start + 1 + selectedText.length + 2;
-            selectionOffsetEnd = selectionOffsetStart + "כתובת קישור".length;
-        } else {
-            // אין טקסט מסומן
-            // [טקסט קישור](כתובת קישור)
-            finalString = `[טקסט קישור](כתובת קישור)`;
-            // אנחנו רוצים לסמן את "כתובת קישור"
-            selectionOffsetStart = start + "[טקסט קישור](".length;
-            selectionOffsetEnd = selectionOffsetStart + "כתובת קישור".length;
-        }
-
+        const selectedText = textarea.value.substring(start, end);
+        let finalString = selectedText.length > 0 ? `[${selectedText}](כתובת קישור)` : `[טקסט קישור](כתובת קישור)`;
         insertTextCommand(textarea, finalString);
-        textarea.setSelectionRange(selectionOffsetStart, selectionOffsetEnd);
+        const newCursor = textarea.selectionEnd;
+        textarea.setSelectionRange(newCursor - "כתובת קישור".length - 1, newCursor - 1);
     }
 
-// --- יצירת התצוגה המקדימה ---
+    function insertTable(textarea) {
+        const tableTemplate = `
+| כותרת 1 | כותרת 2 |
+|---|---|
+| תא 1 | תא 2 |
+`;
+        insertTextCommand(textarea, tableTemplate);
+    }
+
+    // --- יצירת התצוגה המקדימה ---
     function createLivePreview(textarea, toolbar) {
-        // פונקציה פנימית לשליפת פרטים עדכניים
         const getUserDetails = () => {
             let name = "אני";
             let avatar = "https://secure.gravatar.com/avatar/00000000000000000000000000000000?d=mm&f=y";
-
             try {
-                // סלקטור משופר שתופס את השם גם אם הקישור משתנה מעט
                 const nameEl = document.querySelector('app-topnavbar a[href*="user/info"] span');
                 if (nameEl) {
                     const fullName = nameEl.innerText.trim();
-                    if (fullName) name = fullName.split(' ')[0]; // שם פרטי בלבד
+                    if (fullName) name = fullName.split(' ')[0];
                 }
             } catch(e) {}
-
             const inputMessageContainer = textarea.closest('.chat-message');
             if (inputMessageContainer) {
                 const avatarImg = inputMessageContainer.querySelector('img.message-avatar');
@@ -240,9 +254,7 @@
             return { name, avatar };
         };
 
-        // שליפה ראשונית
         let currentDetails = getUserDetails();
-
         const previewDiv = document.createElement('div');
         previewDiv.id = 'nf-live-preview-container';
         previewDiv.className = 'chat-message left';
@@ -256,7 +268,7 @@
                         <span class="time-ago" style="font-weight: bold; color: #1ab394;">תצוגה מקדימה</span>
                     </div>
                 </div>
-                <div class="message-content" style="padding-top: 5px;"></div>
+                <div class="message-content nf-preview-content" style="padding-top: 5px;"></div>
             </div>
         `;
 
@@ -272,10 +284,7 @@
         const avatarImg = previewDiv.querySelector('img.message-avatar');
 
         const updatePreview = () => {
-            const rawText = textarea.value;
-            contentDiv.innerHTML = markdownToHtml(rawText);
-
-            // מנגנון תיקון עצמי: אם השם הוא עדיין "אני", נסה לשלוף שוב את הפרטים
+            contentDiv.innerHTML = markdownToHtml(textarea.value);
             if (currentDetails.name === "אני") {
                 const newDetails = getUserDetails();
                 if (newDetails.name !== "אני") {
@@ -294,13 +303,12 @@
         return previewDiv;
     }
 
-    // --- יצירת הסרגל ---
+    // --- סרגל כלים ---
     function createToolbar(textarea) {
         const toolbar = document.createElement('div');
         toolbar.className = 'nf-md-toolbar';
         toolbar.onmousedown = (e) => e.preventDefault();
 
-        // מיכל לכפתורי העיצוב (צד ימין)
         const toolsGroup = document.createElement('div');
         toolsGroup.className = 'nf-btn-group';
 
@@ -310,10 +318,7 @@
             btn.type = 'button';
             btn.title = title;
             btn.innerHTML = `<i class="fa ${icon}"></i>`;
-            btn.onclick = (e) => {
-                e.preventDefault();
-                onClick();
-            };
+            btn.onclick = (e) => { e.preventDefault(); onClick(); };
             return btn;
         };
         const createSep = () => {
@@ -322,9 +327,6 @@
             return div;
         };
 
-        // --- כפתורים לקבוצה הימנית ---
-
-        // כותרות
         const headingWrapper = document.createElement('div');
         headingWrapper.style.position = 'relative';
         const headingBtn = createBtn('fa-heading', 'כותרת', () => { headingList.classList.toggle('show'); });
@@ -346,25 +348,26 @@
         toolsGroup.appendChild(headingWrapper);
 
         toolsGroup.appendChild(createSep());
-
-        // עיצוב בסיסי
         toolsGroup.appendChild(createBtn('fa-bold', 'מודגש', () => insertSmart(textarea, '**', '**', 'טקסט מודגש')));
         toolsGroup.appendChild(createBtn('fa-italic', 'נטוי', () => insertSmart(textarea, '*', '*', 'טקסט נטוי')));
         toolsGroup.appendChild(createBtn('fa-strikethrough', 'קו חוצה', () => insertSmart(textarea, '~~', '~~', 'קו חוצה')));
 
         toolsGroup.appendChild(createSep());
-
-        // אלמנטים
         toolsGroup.appendChild(createBtn('fa-list-ul', 'רשימה', () => insertSmart(textarea, '* ', '', 'פריט רשימה')));
-        // שימוש בפונקציית הקישור החדשה
+        toolsGroup.appendChild(createBtn('fa-list-ol', 'רשימה ממוספרת', () => insertSmart(textarea, '1. ', '', 'פריט ראשון')));
+        toolsGroup.appendChild(createBtn('fa-quote-right', 'ציטוט', () => insertSmart(textarea, '> ', '', 'טקסט מצוטט')));
+
+        toolsGroup.appendChild(createSep());
         toolsGroup.appendChild(createBtn('fa-link', 'קישור', () => insertLink(textarea)));
+        toolsGroup.appendChild(createBtn('fa-image', 'תמונה', () => insertSmart(textarea, '![תיאור תמונה](', ')', 'כתובת התמונה')));
+        toolsGroup.appendChild(createBtn('fa-table', 'טבלה', () => insertTable(textarea)));
+
+        toolsGroup.appendChild(createSep());
         toolsGroup.appendChild(createBtn('fa-code', 'בלוק קוד', () => insertSmart(textarea, '\n```\n', '\n```\n', 'קוד')));
         toolsGroup.appendChild(createBtn('fa-minus', 'קו הפרדה', () => insertSmart(textarea, '\n***\n', '', '')));
 
-        // הוספת הקבוצה הימנית לסרגל
         toolbar.appendChild(toolsGroup);
 
-        // --- כפתור תצוגה מקדימה (צד שמאל - נפרד) ---
         const previewToggleBtn = document.createElement('button');
         previewToggleBtn.className = 'nf-md-btn';
         previewToggleBtn.title = 'הסתר תצוגה מקדימה';
@@ -374,20 +377,13 @@
             const previewContainer = document.getElementById('nf-live-preview-container');
             if (previewContainer) {
                 const isHidden = previewContainer.classList.contains('hidden');
-                if (isHidden) {
-                    previewContainer.classList.remove('hidden');
-                    previewToggleBtn.innerHTML = `<i class="fa fa-eye-slash"></i>`;
-                    previewToggleBtn.title = 'הסתר תצוגה מקדימה';
-                } else {
-                    previewContainer.classList.add('hidden');
-                    previewToggleBtn.innerHTML = `<i class="fa fa-eye"></i>`;
-                    previewToggleBtn.title = 'הצג תצוגה מקדימה';
-                }
+                previewContainer.classList.toggle('hidden');
+                previewToggleBtn.innerHTML = isHidden ? `<i class="fa fa-eye-slash"></i>` : `<i class="fa fa-eye"></i>`;
+                previewToggleBtn.title = isHidden ? 'הסתר תצוגה מקדימה' : 'הצג תצוגה מקדימה';
             }
         };
         toolbar.appendChild(previewToggleBtn);
 
-        // סגירת דרופדאון בלחיצה בחוץ
         document.addEventListener('click', (e) => {
             if (!headingWrapper.contains(e.target)) headingList.classList.remove('show');
         });
@@ -402,7 +398,8 @@
                 e.preventDefault();
                 const buttons = document.querySelectorAll('button');
                 for (let btn of buttons) {
-                    if (btn.innerText.includes('שלח') && !btn.disabled) {
+                    // תיקון: בדיקה מורחבת גם ל"שליחת"
+                    if ((btn.innerText.includes('שלח') || btn.innerText.includes('שליחת')) && !btn.disabled) {
                         btn.click();
                         break;
                     }
