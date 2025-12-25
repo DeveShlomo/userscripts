@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Markdown Editor in NetFree
 // @namespace    http://tampermonkey.net/
-// @version      3.0
+// @version      3.1
 // @description  עורך טקסט מתקדם לנטפרי
 // @author       לאצי&AI
 // @match        https://netfree.link/app/*
@@ -172,8 +172,14 @@
             .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
             .replace(/\*(.*?)\*/g, '<i>$1</i>')
             .replace(/~~(.*?)~~/g, '<del>$1</del>')
-            // תמונות - שיפור הרגקס
-            .replace(/!\[(.*?)\]\((.*?)\)/g, '<img src="$2" alt="$1">')
+            // תמונות
+            .replace(/!\[(.*?)\]\((.*?)\)/g, (match, alt, url) => {
+                // אם זו תמונה שהועלתה לנטפרי (נתיב יחסי), נוסיף / בהתחלה
+                if (url.trim().startsWith('upload-file/')) {
+                    url = '/' + url.trim();
+                }
+                return `<img src="${url}" alt="${alt}">`;
+            })
             // קישורים
             .replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank" style="color:#1ab394">$1</a>')
             .replace(/`([^`\n]+)`/g, '<code>$1</code>')
