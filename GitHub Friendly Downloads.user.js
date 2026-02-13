@@ -28,6 +28,8 @@
 
             // תוויות כרטיסים
             tag_install: 'התקנה',
+            tag_admin_install: 'התקנה רגילה'
+            tag_user_install: 'התקן כמשתמש',
             tag_store: 'חנות מיקרוסופט',
             tag_portable: 'נייד',
             tag_script: 'סקריפט',
@@ -61,6 +63,8 @@
 
             // Card Tags
             tag_install: 'Installer',
+            tag_admin_install: 'System Install'
+            tag_user_install: 'User Install',
             tag_store: 'MS Store',
             tag_portable: 'Portable',
             tag_script: 'Script',
@@ -121,6 +125,7 @@
 
             /* צבעים למצב כהה */
             .gfd-tag.type-install { background: rgba(46,160,67,0.15); color: #3fb950; }
+            .gfd-tag.type-user-install { background: rgba(187,128,9,0.15); color: #e3b341; border: 1px solid rgba(187,128,9,0.4); } 
             .gfd-tag.type-store { background: rgba(219, 97, 162, 0.15); color: #db61a2; }
             .gfd-tag.type-portable { background: rgba(56,139,253,0.15); color: #58a6ff; }
             .gfd-tag.type-arch { background: #161b22; color: #8b949e; border-color: #30363d; }
@@ -148,6 +153,7 @@
         }
 
         [data-color-mode="dark"] .gfd-tag.type-install, [data-dark-theme="dark"] .gfd-tag.type-install { background: rgba(46,160,67,0.15); color: #3fb950; }
+        [data-color-mode="dark"] .gfd-tag.type-user-install, [data-dark-theme="dark"] .gfd-tag.type-user-install { background: rgba(187,128,9,0.15); color: #e3b341; border: 1px solid rgba(187,128,9,0.4); }
         [data-color-mode="dark"] .gfd-tag.type-store, [data-dark-theme="dark"] .gfd-tag.type-store { background: rgba(219, 97, 162, 0.15); color: #db61a2; }
         [data-color-mode="dark"] .gfd-tag.type-portable, [data-dark-theme="dark"] .gfd-tag.type-portable { background: rgba(56,139,253,0.15); color: #58a6ff; }
         [data-color-mode="dark"] .gfd-tag.type-arch, [data-dark-theme="dark"] .gfd-tag.type-arch { background: #161b22; color: #8b949e; border-color: #30363d; }
@@ -290,6 +296,7 @@
 
         /* צבעים ברירת מחדל */
         .gfd-tag.type-install { background: #dafbe1; color: #1a7f37; }
+        .gfd-tag.type-user-install { background: #fff8c5; color: #9a6700; border: 1px solid #d3c893; }
         .gfd-tag.type-store { background: #fbefff; color: #8250df; }
         .gfd-tag.type-portable { background: #ddf4ff; color: #0969da; }
         .gfd-tag.type-arch { background: #f6f8fa; color: #57606a; border: 1px solid #d0d7de; }
@@ -405,13 +412,14 @@
             arch: '',
             interface: '',
             labelInterface: '',
+            isUser: lower.includes('user'),
             isJunk: false,
             labelOS: LANG.cat_other,
             labelType: LANG.cat_other
         };
 
         // 1. סינון זבל טכני
-        if (lower.endsWith('.asc') || lower.endsWith('.sig') || lower.endsWith('.sha256') || lower.endsWith('.md5') || lower.endsWith('.blockmap') || lower.endsWith('.pdb') || lower.includes('pdbs-')) {
+        if (lower.endsWith('.asc') || lower.endsWith('.sig') || lower.endsWith('.sha256') || lower.endsWith('.yml') || lower.endsWith('.md5') || lower.endsWith('.blockmap') || lower.endsWith('.pdb') || lower.includes('pdbs-')) {
             info.isJunk = true;
             return info;
         }
@@ -515,14 +523,24 @@
         return match ? match[0] : '';
     }
 
-    function createCard(fileData) {
+    function createCard(fileData, hasUserOption) {
         const { name, size, href, parsed } = fileData;
 
         let tagsHtml = '';
         if (parsed.interface === 'CLI') tagsHtml += `<span class="gfd-tag type-cli">${parsed.labelInterface}</span>`;
         if (parsed.interface === 'GUI') tagsHtml += `<span class="gfd-tag type-gui">${parsed.labelInterface}</span>`;
 
-        if (parsed.type === 'installer') tagsHtml += `<span class="gfd-tag type-install">${LANG.tag_install}</span>`;
+        if (parsed.type === 'installer') {
+            if (hasUserOption) {
+                // אם יש גרסת משתמש בדף, נפריד בין "רגילה" ל"משתמש"
+                const label = parsed.isUser ? LANG.tag_user_install : LANG.tag_admin_install;
+                const extraClass = parsed.isUser ? 'type-user-install' : ''; // אפשר להוסיף CSS מיוחד בסטייל למעלה אם תרצה
+                tagsHtml += `<span class="gfd-tag type-install ${extraClass}">${label}</span>`;
+            } else {
+                // אם אין גרסת משתמש, נשאיר "התקנה" כרגיל
+                tagsHtml += `<span class="gfd-tag type-install">${LANG.tag_install}</span>`;
+            }
+        }
         if (parsed.type === 'store') tagsHtml += `<span class="gfd-tag type-store">${LANG.tag_store}</span>`;
         if (parsed.type === 'portable') tagsHtml += `<span class="gfd-tag type-portable">${LANG.tag_portable}</span>`;
 
@@ -622,6 +640,7 @@
 
         const downloadLinks = assetsContainer.querySelectorAll('a[href*="/releases/download/"], a[href*="/archive/"]');
         const files = [];
+        let hasUserOption = false;
 
         downloadLinks.forEach(link => {
             const row = link.closest('li') || link.closest('.Box-row') || link.parentElement;
@@ -634,7 +653,11 @@
             const href = link.href;
             const size = cleanSizeText(row.textContent);
 
-            files.push({ name, href, size, parsed: parseFileInfo(name) });
+            const parsed = parseFileInfo(name);
+            if (parsed.isUser) hasUserOption = true;
+
+
+            files.push({ name, href, size, parsed: parsed });
         });
 
         const grouped = { windows: [], android: [], mac: [], linux: [], other: [], source: [] };
@@ -689,7 +712,7 @@
 
                 const grid = document.createElement('div');
                 grid.className = 'gfd-grid';
-                grouped[cat.key].forEach(file => grid.appendChild(createCard(file)));
+                grouped[cat.key].forEach(file => grid.appendChild(createCard(file, hasUserOption)));
 
                 section.appendChild(grid);
                 content.appendChild(section);
