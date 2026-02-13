@@ -411,7 +411,7 @@
         };
 
         // 1. סינון זבל טכני
-        if (lower.endsWith('.asc') || lower.endsWith('.sig') || lower.endsWith('.sha256') || lower.endsWith('.md5') || lower.endsWith('.blockmap') || lower.endsWith('.pdb') || lower.includes('pdbs-')) {
+        if (lower.endsWith('.asc') || lower.endsWith('.sig') || lower.endsWith('.sha256') || lower.endsWith('.md5') || lower.endsWith('.yml')|| lower.includes('-symbols')) || lower.endsWith('.blockmap') || lower.endsWith('.pdb') || lower.includes('pdbs-')) {
             info.isJunk = true;
             return info;
         }
