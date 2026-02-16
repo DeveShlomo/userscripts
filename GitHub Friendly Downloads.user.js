@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GitHub Friendly Downloads
 // @namespace    http://tampermonkey.net/
-// @version      1.3
+// @version      1.4
 // @description  Clean and friendly GitHub downloads page.
 // @author       לאצי@ai
 // @match        https://github.com/*
@@ -28,6 +28,8 @@
 
             // תוויות כרטיסים
             tag_install: 'התקנה',
+            tag_admin_install: 'התקנה רגילה',
+            tag_user_install: 'התקן כמשתמש',
             tag_store: 'חנות מיקרוסופט',
             tag_portable: 'נייד',
             tag_script: 'סקריפט',
@@ -61,6 +63,8 @@
 
             // Card Tags
             tag_install: 'Installer',
+            tag_admin_install: 'System Install',
+            tag_user_install: 'User Install',
             tag_store: 'MS Store',
             tag_portable: 'Portable',
             tag_script: 'Script',
@@ -121,6 +125,7 @@
 
             /* צבעים למצב כהה */
             .gfd-tag.type-install { background: rgba(46,160,67,0.15); color: #3fb950; }
+            .gfd-tag.type-user-install { background: rgba(187,128,9,0.15); color: #e3b341; border: 1px solid rgba(187,128,9,0.4); }
             .gfd-tag.type-store { background: rgba(219, 97, 162, 0.15); color: #db61a2; }
             .gfd-tag.type-portable { background: rgba(56,139,253,0.15); color: #58a6ff; }
             .gfd-tag.type-arch { background: #161b22; color: #8b949e; border-color: #30363d; }
@@ -148,6 +153,7 @@
         }
 
         [data-color-mode="dark"] .gfd-tag.type-install, [data-dark-theme="dark"] .gfd-tag.type-install { background: rgba(46,160,67,0.15); color: #3fb950; }
+        [data-color-mode="dark"] .gfd-tag.type-user-install, [data-dark-theme="dark"] .gfd-tag.type-user-install { background: rgba(187,128,9,0.15); color: #e3b341; border: 1px solid rgba(187,128,9,0.4); }
         [data-color-mode="dark"] .gfd-tag.type-store, [data-dark-theme="dark"] .gfd-tag.type-store { background: rgba(219, 97, 162, 0.15); color: #db61a2; }
         [data-color-mode="dark"] .gfd-tag.type-portable, [data-dark-theme="dark"] .gfd-tag.type-portable { background: rgba(56,139,253,0.15); color: #58a6ff; }
         [data-color-mode="dark"] .gfd-tag.type-arch, [data-dark-theme="dark"] .gfd-tag.type-arch { background: #161b22; color: #8b949e; border-color: #30363d; }
@@ -214,8 +220,6 @@
             display: flex;
             align-items: center;
             gap: 8px;
-            border-bottom: 1px solid var(--gfd-border);
-            padding-bottom: 6px;
         }
 
         .gfd-grid {
@@ -225,71 +229,65 @@
         }
 
         .gfd-card {
-            display: flex;
-            flex-direction: column;
             background: var(--gfd-bg);
             border: 1px solid var(--gfd-border);
             border-radius: var(--gfd-radius);
             padding: 16px;
-            transition: transform 0.2s, box-shadow 0.2s;
-            position: relative;
+            display: flex;
+            flex-direction: column;
+            transition: box-shadow 0.2s, border-color 0.2s;
         }
 
         .gfd-card:hover {
-            transform: translateY(-2px);
-            box-shadow: var(--gfd-shadow);
+            box-shadow: 0 3px 12px rgba(140,149,159,0.2);
             border-color: var(--gfd-primary);
         }
 
         .gfd-card-header {
             display: flex;
-            align-items: flex-start;
             gap: 12px;
             margin-bottom: 12px;
         }
 
         .gfd-icon-box {
-            width: 36px;
-            height: 36px;
             flex-shrink: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: var(--gfd-bg-subtle);
-            border-radius: 8px;
-            color: var(--gfd-text-main);
+            color: var(--gfd-text-muted);
         }
 
         .gfd-file-info {
-            flex-grow: 1;
+            flex: 1;
             min-width: 0;
         }
 
         .gfd-filename {
-            font-size: 13px;
             font-weight: 600;
+            font-size: 13px;
             color: var(--gfd-text-main);
-            word-break: break-all;
-            line-height: 1.4;
-            margin-bottom: 6px;
+            margin-bottom: 8px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
 
         .gfd-tags {
             display: flex;
             flex-wrap: wrap;
-            gap: 4px;
+            gap: 6px;
         }
 
         .gfd-tag {
             font-size: 10px;
-            padding: 2px 6px;
-            border-radius: 10px;
-            font-weight: 500;
-            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            white-space: nowrap;
         }
 
         /* צבעים ברירת מחדל */
         .gfd-tag.type-install { background: #dafbe1; color: #1a7f37; }
+        .gfd-tag.type-user-install { background: #fff8c5; color: #9a6700; border: 1px solid #d3c893; }
         .gfd-tag.type-store { background: #fbefff; color: #8250df; }
         .gfd-tag.type-portable { background: #ddf4ff; color: #0969da; }
         .gfd-tag.type-arch { background: #f6f8fa; color: #57606a; border: 1px solid #d0d7de; }
@@ -396,9 +394,20 @@
         code: `<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>`
     };
 
+    // --- קבלת שם המאגר ---
+    function getRepoName() {
+        const pathParts = window.location.pathname.split('/').filter(Boolean);
+        if (pathParts.length >= 2) {
+            return pathParts[0] + '/' + pathParts[1];
+        }
+        return '';
+    }
+
     // --- לוגיקה לזיהוי קבצים ---
     function parseFileInfo(filename) {
         const lower = filename.toLowerCase();
+        const repoName = getRepoName().toLowerCase();
+        
         let info = {
             os: 'other',
             type: 'file',
@@ -406,35 +415,81 @@
             interface: '',
             labelInterface: '',
             isJunk: false,
+            isUser: false,
             labelOS: LANG.cat_other,
             labelType: LANG.cat_other
         };
 
-        // 1. סינון זבל טכני
-        if (lower.endsWith('.asc') || lower.endsWith('.sig') || lower.endsWith('.sha256') || lower.endsWith('.md5') || lower.endsWith('.yml')|| lower.includes('-symbols')) || lower.endsWith('.blockmap') || lower.endsWith('.pdb') || lower.includes('pdbs-')) {
+        // 1. סינון זבל טכני - מורחב
+        const junkExtensions = ['.asc', '.sig', '.sha256', '.sha512', '.md5', '.blockmap', '.yml', '.yaml'];
+        const junkPatterns = ['pdbs-'];
+        
+        // בדיקה אם זה קובץ זבל ישיר
+        if (junkExtensions.some(ext => lower.endsWith(ext)) || junkPatterns.some(pattern => lower.includes(pattern))) {
             info.isJunk = true;
             return info;
         }
 
-        // 2. זיהוי מערכת הפעלה
+        // 2. זיהוי קבצי ארכיון
+        const archiveExtensions = ['.zip', '.7z', '.tar.gz', '.tar.bz2', '.rar', '.gz', '.bz2'];
+        const isArchive = archiveExtensions.some(ext => lower.endsWith(ext));
+
+        // 3. סינון קבצי זבל בתוך ארכיונים (כמו .pdb.zip)
+        const junkInArchive = ['.pdb', '.sym'];
+        if (isArchive) {
+            // מסיר את הסיומת של הארכיון ובודק אם מה שנשאר הוא קובץ זבל
+            const withoutArchiveExt = lower.replace(/\.(zip|7z|tar\.gz|tar\.bz2|rar|gz|bz2)$/, '');
+            if (junkInArchive.some(ext => withoutArchiveExt.endsWith(ext))) {
+                info.isJunk = true;
+                return info;
+            }
+            
+            // סינון symbols רק אם הוא בארכיון ולא חלק משם המאגר
+            if (lower.includes('symbols') || lower.includes('symbol')) {
+                // בדיקה אם symbols מופיע בשם המאגר
+                if (!repoName.includes('symbol')) {
+                    // בדיקה נוספת - אם זה לא קובץ installer
+                    if (!lower.includes('setup') && !lower.includes('installer') && 
+                        !lower.endsWith('.exe') && !lower.endsWith('.msi')) {
+                        info.isJunk = true;
+                        return info;
+                    }
+                }
+            }
+        }
+
+        // 4. זיהוי התקנת משתמש
+        if (lower.includes('user') && !lower.includes('username') && !lower.includes('userguide')) {
+            info.isUser = true;
+        }
+
+        // 5. זיהוי מערכת הפעלה
         // -- Windows --
-        if (lower.includes('win') || lower.endsWith('.exe') || lower.endsWith('.msi') || lower.endsWith('.msix') || lower.endsWith('.msixbundle') || lower.endsWith('.appx') || lower.endsWith('.appxbundle') || lower.includes('mingit')) {
-            info.os = 'windows'; info.labelOS = LANG.cat_windows;
+        if (lower.includes('win') || lower.endsWith('.exe') || lower.endsWith('.msi') || 
+            lower.endsWith('.msix') || lower.endsWith('.msixbundle') || 
+            lower.endsWith('.appx') || lower.endsWith('.appxbundle') || lower.includes('mingit')) {
+            info.os = 'windows'; 
+            info.labelOS = LANG.cat_windows;
         }
         // -- Android --
         else if (lower.includes('android') || lower.endsWith('.apk')) {
-            info.os = 'android'; info.labelOS = LANG.cat_android;
+            info.os = 'android'; 
+            info.labelOS = LANG.cat_android;
         }
         // -- macOS --
-        else if (lower.includes('mac') || lower.includes('darwin') || lower.includes('osx') || lower.endsWith('.dmg') || lower.endsWith('.pkg')) {
-            info.os = 'mac'; info.labelOS = LANG.cat_mac;
+        else if (lower.includes('mac') || lower.includes('darwin') || lower.includes('osx') || 
+                 lower.endsWith('.dmg') || lower.endsWith('.pkg')) {
+            info.os = 'mac'; 
+            info.labelOS = LANG.cat_mac;
         }
         // -- Linux --
-        else if (lower.includes('linux') || lower.endsWith('.deb') || lower.endsWith('.rpm') || lower.endsWith('.appimage') || lower.endsWith('.tar.bz2') || lower.endsWith('.tbz2')) {
-            info.os = 'linux'; info.labelOS = LANG.cat_linux;
+        else if (lower.includes('linux') || lower.endsWith('.deb') || lower.endsWith('.rpm') || 
+                 lower.endsWith('.appimage') || lower.endsWith('.tar.bz2') || lower.endsWith('.tbz2')) {
+            info.os = 'linux'; 
+            info.labelOS = LANG.cat_linux;
         }
 
-        // 3. זיהוי סוג ממשק
+        // 6. זיהוי סוג ממשק
         if (lower.includes('cli') || lower.includes('headless') || lower.includes('server') || lower.includes('terminal')) {
             info.interface = 'CLI';
             info.labelInterface = LANG.tag_cli;
@@ -443,17 +498,23 @@
             info.labelInterface = LANG.tag_gui;
         }
 
-        // 4. זיהוי סוג קובץ
+        // 7. זיהוי סוג קובץ
         // חנות מיקרוסופט
-        if (lower.endsWith('.appx') || lower.endsWith('.appxbundle') || lower.endsWith('.msix') || lower.endsWith('.msixbundle')) {
+        if (lower.endsWith('.appx') || lower.endsWith('.appxbundle') || 
+            lower.endsWith('.msix') || lower.endsWith('.msixbundle')) {
             info.type = 'store';
             info.labelType = LANG.desc_store;
             info.interface = 'GUI';
             info.labelInterface = LANG.tag_gui;
-            if (info.os === 'other') { info.os = 'windows'; info.labelOS = LANG.cat_windows; }
+            if (info.os === 'other') { 
+                info.os = 'windows'; 
+                info.labelOS = LANG.cat_windows; 
+            }
         }
         // התקנה רגילה
-        else if (lower.endsWith('.exe') || lower.endsWith('.msi') || lower.includes('setup') || lower.includes('installer') || lower.endsWith('.deb') || lower.endsWith('.rpm') || lower.endsWith('.apk') || lower.endsWith('.dmg') || lower.endsWith('.pkg')) {
+        else if (lower.endsWith('.exe') || lower.endsWith('.msi') || lower.includes('setup') || 
+                 lower.includes('installer') || lower.endsWith('.deb') || lower.endsWith('.rpm') || 
+                 lower.endsWith('.apk') || lower.endsWith('.dmg') || lower.endsWith('.pkg')) {
             info.type = 'installer';
             info.labelType = LANG.desc_install;
             if (!info.interface) {
@@ -473,7 +534,8 @@
             info.interface = 'CLI';
             info.labelInterface = LANG.tag_cli;
             if (info.os === 'other' && !lower.endsWith('.py')) {
-                info.os = 'linux'; info.labelOS = LANG.cat_linux;
+                info.os = 'linux'; 
+                info.labelOS = LANG.cat_linux;
             }
         }
         // קוד מקור
@@ -482,7 +544,7 @@
             info.labelType = LANG.desc_source;
         }
 
-        // 5. זיהוי ארכיטקטורה
+        // 8. זיהוי ארכיטקטורה
         if (lower.includes('x64') || lower.includes('x86_64') || lower.includes('amd64') || lower.includes('64bit')) {
             info.arch = '64-bit';
         } else if (lower.includes('x86') || lower.includes('32bit') || (lower.includes('win32') && !lower.includes('win32-x64'))) {
@@ -515,14 +577,30 @@
         return match ? match[0] : '';
     }
 
-    function createCard(fileData) {
+    function createCard(fileData, hasUserOption) {
         const { name, size, href, parsed } = fileData;
 
         let tagsHtml = '';
+        
+        // תווית ממשק
         if (parsed.interface === 'CLI') tagsHtml += `<span class="gfd-tag type-cli">${parsed.labelInterface}</span>`;
         if (parsed.interface === 'GUI') tagsHtml += `<span class="gfd-tag type-gui">${parsed.labelInterface}</span>`;
 
-        if (parsed.type === 'installer') tagsHtml += `<span class="gfd-tag type-install">${LANG.tag_install}</span>`;
+        // תוויות סוג התקנה
+        if (parsed.type === 'installer') {
+            if (hasUserOption) {
+                // יש גרסת user וגרסה רגילה - להציג רק את הרלוונטי
+                if (parsed.isUser) {
+                    tagsHtml += `<span class="gfd-tag type-user-install">${LANG.tag_user_install}</span>`;
+                } else {
+                    tagsHtml += `<span class="gfd-tag type-install">${LANG.tag_admin_install}</span>`;
+                }
+            } else {
+                // אין הבחנה - להציג רק "התקנה"
+                tagsHtml += `<span class="gfd-tag type-install">${LANG.tag_install}</span>`;
+            }
+        }
+        
         if (parsed.type === 'store') tagsHtml += `<span class="gfd-tag type-store">${LANG.tag_store}</span>`;
         if (parsed.type === 'portable') tagsHtml += `<span class="gfd-tag type-portable">${LANG.tag_portable}</span>`;
 
@@ -622,6 +700,7 @@
 
         const downloadLinks = assetsContainer.querySelectorAll('a[href*="/releases/download/"], a[href*="/archive/"]');
         const files = [];
+        let hasUserOption = false;
 
         downloadLinks.forEach(link => {
             const row = link.closest('li') || link.closest('.Box-row') || link.parentElement;
@@ -634,7 +713,10 @@
             const href = link.href;
             const size = cleanSizeText(row.textContent);
 
-            files.push({ name, href, size, parsed: parseFileInfo(name) });
+            const parsed = parseFileInfo(name);
+            if (parsed.isUser) hasUserOption = true;
+
+            files.push({ name, href, size, parsed });
         });
 
         const grouped = { windows: [], android: [], mac: [], linux: [], other: [], source: [] };
@@ -653,13 +735,14 @@
         // --- מיון פנימי בתוך קטגוריית Windows ---
         if (grouped.windows.length > 0) {
             grouped.windows.sort((a, b) => {
-                const getScore = (type) => {
-                    if (type === 'installer') return 1;
-                    if (type === 'store') return 2;
-                    if (type === 'portable') return 3;
-                    return 4;
+                const getScore = (type, isUser) => {
+                    if (type === 'installer' && !isUser) return 1;
+                    if (type === 'installer' && isUser) return 2;
+                    if (type === 'store') return 3;
+                    if (type === 'portable') return 4;
+                    return 5;
                 };
-                return getScore(a.parsed.type) - getScore(b.parsed.type);
+                return getScore(a.parsed.type, a.parsed.isUser) - getScore(b.parsed.type, b.parsed.isUser);
             });
         }
 
@@ -689,7 +772,7 @@
 
                 const grid = document.createElement('div');
                 grid.className = 'gfd-grid';
-                grouped[cat.key].forEach(file => grid.appendChild(createCard(file)));
+                grouped[cat.key].forEach(file => grid.appendChild(createCard(file, hasUserOption)));
 
                 section.appendChild(grid);
                 content.appendChild(section);
